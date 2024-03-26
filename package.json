@@ -5,14 +5,14 @@
   "scripts": {
     "build": "turbo run build",
     "clean": "turbo run clean",
-    "dev": "turbo run dev",
+    "dev": "dotenv -- turbo run dev",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "lint": "turbo run lint",
     "test": "turbo run test"
   },
-  "dependencies": {},
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
+    "dotenv-cli": "^7.4.1",
     "prettier": "^3.2.5",
     "turbo": "latest"
   },
