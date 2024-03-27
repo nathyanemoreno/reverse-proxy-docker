@@ -1,14 +1,14 @@
 import { json, urlencoded } from "body-parser";
-import express from "express";
-import morgan from "morgan";
+import express, { Express } from "express";
 import cors from "cors";
+import pino from "pino-http";
 
-export const createServer = () => {
+export const createServer: () => Express = () => {
   const app = express();
   app
     .disable("x-powered-by")
-    .use(morgan("dev"))
     .use(urlencoded({ extended: true }))
+    .use(pino())
     .use(json())
     .use(cors())
     .get("/message/:name", (req, res) => {
