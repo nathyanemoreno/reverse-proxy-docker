@@ -1,29 +1,123 @@
-version: "3"
+x-nginx: &nginx
+  container_name: rpd-nginx
+  image: nginx:1.19-alpine
+  volumes:
+    - ./nginx/${NODE_ENV}/templates:/etc/nginx/templates:ro
+    - ./certbot/conf:/etc/letsencrypt:ro
+    - ./certbot/www:/var/www/certbot
+
+x-certbot: &certbot
+  container_name: rpd-certbot
+  image: certbot/certbot
+  # Add --force-renew flag when in production
+  command: >-
+    certonly --non-interactive --agree-tos --no-eff-email
+    --webroot -w /var/www/certbot 
+    --email ${CERTBOT_EMAIL} 
+    -d ${DOMAIN}
+  volumes:
+    - ./certbot/conf:/etc/letsencrypt
+    - ./certbot/www:/var/www/certbot
+  env_file:
+    - path: .env.development.local
+      required: true
+    - path: .env
+      required: false
+
 
 services:
+  mongo:
+    image: mongo:6.0
+    container_name: rpd-mongodb
+    volumes:
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - mongodb-data:/data/db
+    environment:
+      PUID: 1000
+      PGID: 1000
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
+    expose:
+      - ${MONGODB_PORT}
+    restart: always
+    networks:
+      - default
+    profiles:
+      - production
+      - development
+    env_file:
+    - path: .env.development
+      required: true
+    - path: .env
+      required: false
   web:
-    container_name: web
+    container_name: rpd-web
     build:
       context: .
       dockerfile: ./apps/web/Dockerfile
     restart: always
-    ports:
-      - 3000:3000
+    expose:
+      - ${NEXT_APP_PORT}
     networks:
-      - app_network
+      - default
+    profiles:
+      - development
+      - production
+    env_file:
+    - path: .env.development
+      required: true
+    - path: .env
+      required: false
   api:
-    container_name: api
+    container_name: rpd-api
     build:
       context: .
       dockerfile: ./apps/api/Dockerfile
     restart: always
-    ports:
-      - 3001:3001
+    expose:
+      - ${API_PORT}
     networks:
-      - app_network
+      - default
+    profiles:
+      - development
+      - production
+    env_file:
+    - path: .env.development
+      required: true
+    - path: .env
+      required: false
+  nginx:
+    <<: *nginx
+    restart: always
+    ports:
+      - ${NGINX_PORT}:${NGINX_PORT}
+      # Comment this line when on development mode
+      - 443:443
+    profiles:
+      - development
+      - production
+  certbot:
+    <<: *certbot
+    depends_on:
+      - nginx-init
+    profiles:
+      - production
+      - certification
+  nginx-init:
+    <<: *nginx
+    container_name: rpd-nginx-init # Unique container name for nginx-init service
+    volumes:
+      - ./nginx/production/default_init.conf:/etc/nginx/nginx.conf:ro
+    profiles:
+      - production
+      - certification
 
 # Define a network, which allows containers to communicate
 # with each other, by using their container name as a hostname
 networks:
-  app_network:
-    external: true
+  default:
+    driver: bridge
+
+volumes:
+  mongodb-data:
